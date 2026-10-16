@@ -20,6 +20,12 @@ gesture_node:
     # Publish anh debug (khung nguoi + xac suat) len /gesture/debug_image
     publish_debug_image: true
 
+    # Giao dien anh debug. Doi duoc ngay khi node dang chay:
+    #   ros2 param set /gesture_node debug_panel_scale 0.7
+    debug_panel_position: "right"   # right | left | bottom (canh video, khong che) | overlay (de len goc trai tren)
+    debug_panel_scale: 1.0           # co chu + bang: 0.5 = nho mot nua, 1.5 = to gap ruoi
+    debug_box_thickness: 2           # do day khung nguoi (pixel)
+
     # Bo loc lenh (giong robot_control.py)
     conf_threshold: 0.7    # xac suat toi thieu de chap nhan cu chi
     confirm_count: 3       # so lan du doan lien tiep de doi lenh (Halt luon = 1)

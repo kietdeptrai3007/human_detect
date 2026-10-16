@@ -27,6 +27,19 @@ Lệnh chỉ đổi khi cùng một cử chỉ đạt xác suất ≥ `conf_thre
 Mất người quá `lost_sec`, hoặc không thấy cử chỉ quá `hold_sec`, thì lệnh về `Attention`.
 Bảng cử chỉ → vận tốc nằm ở `human_detection/gesture/command_filter.py`. Toàn bộ tham số nằm trong `config/gesture_params.yaml`.
 
+Giao diện ảnh debug (`/gesture/debug_image`) chỉnh bằng tham số, **đổi được ngay khi node đang chạy**:
+
+| Tham số | Mặc định | Ý nghĩa |
+|---|---|---|
+| `debug_panel_position` | `right` | `right` / `left` / `bottom`: bảng nằm cạnh video, không che; `overlay`: đè lên góc trái trên |
+| `debug_panel_scale` | `1.0` | Cỡ chữ và bảng (0.5 = nhỏ một nửa, 1.5 = to gấp rưỡi) |
+| `debug_box_thickness` | `2` | Độ dày khung người (pixel) |
+
+```bash
+ros2 param set /gesture_node debug_panel_position bottom
+ros2 param set /gesture_node debug_panel_scale 0.7
+```
+
 ## 1. Cài đặt (môi trường ảo, chạy CPU)
 
 Đã test trên ROS 2 **Jazzy** / Ubuntu 24.04 / Python 3.12. Thư viện Python được cài vào **venv**, không cài vào Python hệ thống,

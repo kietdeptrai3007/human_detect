@@ -19,9 +19,11 @@ import threading
 import time
 
 import cv2
+import numpy as np
 import rclpy
 from ament_index_python.packages import get_package_share_directory
 from geometry_msgs.msg import Twist
+from rcl_interfaces.msg import ParameterDescriptor
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
 from sensor_msgs.msg import Image
@@ -38,22 +40,54 @@ REASON_ASCII = {
 }
 
 
-def draw_panel(frame, res, names, cmd) -> None:
-    """Vẽ bảng xác suất các lớp + lệnh hiện tại (giống demo_camera.py)."""
-    h = 54 + 24 * len(names)
-    cv2.rectangle(frame, (0, 0), (300, h), (0, 0, 0), -1)
+PANEL_POSITIONS = ('right', 'left', 'bottom', 'overlay')
+
+
+def make_panel(res, names, cmd, scale: float = 1.0) -> np.ndarray:
+    """Bảng xác suất các lớp + lệnh hiện tại (giống demo_camera.py). scale phóng to/thu nhỏ cả chữ lẫn bảng."""
+    s = max(0.3, float(scale))
+    W, row = int(300 * s), int(24 * s)
+    H = int(54 * s) + row * len(names)
+    panel = np.zeros((H, W, 3), np.uint8)
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    thick = max(1, int(round(s)))
     reason = REASON_ASCII.get(res.reason, res.reason) if res.person else 'no person'
     title = f"{res.label} ({res.prob * 100:.0f}%)" if res.label else reason or "..."
-    cv2.putText(frame, title, (8, 22), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+    cv2.putText(panel, title, (int(8 * s), int(22 * s)), font, 0.7 * s, (0, 255, 0), thick + 1)
     for i, n in enumerate(names):
         p = float(res.probs[i]) if res.probs is not None else 0.0
-        y = 30 + 24 * i + 16
+        y = int(30 * s) + row * i + int(16 * s)
         best = res.label == n
-        cv2.putText(frame, n, (8, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
-                    (0, 255, 0) if best else (200, 200, 200), 1)
-        cv2.rectangle(frame, (130, y - 11), (130 + int(160 * p), y + 2),
+        cv2.putText(panel, n, (int(8 * s), y), font, 0.5 * s,
+                    (0, 255, 0) if best else (200, 200, 200), thick)
+        cv2.rectangle(panel, (int(130 * s), y - int(11 * s)), (int(130 * s) + int(160 * s * p), y + int(2 * s)),
                       (0, 255, 0) if best else (120, 120, 120), -1)
-    cv2.putText(frame, f"CMD: {cmd}", (8, h - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 200, 255), 2)
+    cv2.putText(panel, f"CMD: {cmd}", (int(8 * s), H - int(8 * s)), font, 0.6 * s, (0, 200, 255), thick + 1)
+    return panel
+
+
+def compose(frame: np.ndarray, panel: np.ndarray, position: str) -> np.ndarray:
+    """Ghép bảng vào ảnh: 'right'/'left'/'bottom' đặt cạnh video (không che), 'overlay' đè lên góc trái trên."""
+    fh, fw = frame.shape[:2]
+    ph, pw = panel.shape[:2]
+    if position == 'overlay':
+        out = frame.copy()
+        h, w = min(ph, fh), min(pw, fw)
+        out[:h, :w] = panel[:h, :w]
+        return out
+    if position == 'bottom':
+        out = np.zeros((fh + ph, max(fw, pw), 3), np.uint8)
+        out[:fh, :fw] = frame
+        out[fh:, :pw] = panel
+        return out
+    out = np.zeros((max(fh, ph), fw + pw, 3), np.uint8)
+    if position == 'left':
+        out[:ph, :pw] = panel
+        out[:fh, pw:] = frame
+    else:  # right
+        out[:fh, :fw] = frame
+        out[:ph, fw:] = panel
+    return out
 
 
 class GestureNode(Node):
@@ -70,6 +104,11 @@ class GestureNode(Node):
         self.declare_parameter('device', '')                 # '' = tự chọn, 'cpu', 'cuda'
         self.declare_parameter('qos_reliability', 'sensor_data')
         self.declare_parameter('publish_debug_image', True)
+        # Giao diện ảnh debug: đọc lại mỗi frame -> đổi được khi node đang chạy (ros2 param set ...)
+        flexible = ParameterDescriptor(dynamic_typing=True)   # nhận cả 1 lẫn 1.0
+        self.declare_parameter('debug_panel_position', 'right')   # right | left | bottom | overlay
+        self.declare_parameter('debug_panel_scale', 1.0, flexible)  # cỡ chữ + bảng (1.0 = mặc định)
+        self.declare_parameter('debug_box_thickness', 2, flexible)  # độ dày khung người (pixel)
         self.declare_parameter('conf_threshold', 0.7)
         self.declare_parameter('confirm_count', 3)
         self.declare_parameter('hold_sec', 3.0)
@@ -228,13 +267,21 @@ class GestureNode(Node):
         self.person_pub.publish(out)
 
     def publish_debug_image(self, frame, res, cmd, header):
+        position = str(self.get_parameter('debug_panel_position').value).lower()
+        if position not in PANEL_POSITIONS:
+            self.get_logger().warn(f'debug_panel_position "{position}" khong hop le, dung "right". '
+                                   f'Chon: {PANEL_POSITIONS}', throttle_duration_sec=10.0)
+            position = 'right'
+        scale = float(self.get_parameter('debug_panel_scale').value)
+        box_thick = max(1, int(self.get_parameter('debug_box_thickness').value))
+
         img = frame.copy()
         crop = self.recognizer.last_crop
         if crop is not None:
             x1, y1, x2, y2 = crop.person_box.astype(int)
             cv2.rectangle(img, (x1, y1), (x2, y2),
-                          (0, 255, 0) if crop.detected else (0, 165, 255), 2)
-        draw_panel(img, res, self.names, cmd)
+                          (0, 255, 0) if crop.detected else (0, 165, 255), box_thick)
+        img = compose(img, make_panel(res, self.names, cmd, scale), position)
         self.debug_pub.publish(bgr_to_imgmsg(img, header))
 
     def destroy_node(self):

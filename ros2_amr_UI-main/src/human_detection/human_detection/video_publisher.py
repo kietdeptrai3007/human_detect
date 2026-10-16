@@ -9,6 +9,7 @@ Công cụ test: phát video (hoặc webcam) lên topic ảnh, giả lập packa
 
 import cv2
 import rclpy
+from rcl_interfaces.msg import ParameterDescriptor
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import Image
@@ -21,7 +22,8 @@ class VideoPublisher(Node):
 
     def __init__(self):
         super().__init__('video_publisher')
-        self.declare_parameter('source', '0')
+        # dynamic_typing: nhận cả "source:=0" (ROS hiểu là số) lẫn đường dẫn video (chuỗi)
+        self.declare_parameter('source', '0', ParameterDescriptor(dynamic_typing=True))
         self.declare_parameter('topic', '/image_front')
         self.declare_parameter('frame_id', 'camera_front_link')
         self.declare_parameter('width', 640)

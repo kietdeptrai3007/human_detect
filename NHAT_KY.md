@@ -159,6 +159,16 @@ human_detect/
       **Cần chạy lại `setup_venv.sh` trên robot** để tạo venv trong `projects/human_detect/`, rồi xoá `~/gesture_venv` cũ trên robot.
     - Vấn đề đang mở: trên robot, `rqt_image_view` mở `/gesture/debug_image` nhưng chỉ thấy màu xám. Nghi ngờ QoS không khớp
       (node publish Best Effort, rqt subscribe Reliable) hoặc node không nhận được `/image_front`. Chưa kiểm tra xong.
+16. **Chạy thử trên laptop với webcam: hoạt động** (`video_publisher source:=0` → `gesture_node` → `rqt_image_view` hiện khung người).
+    - Sửa `video_publisher`: `-p source:=0` bị ROS hiểu là số nguyên, gây lỗi `InvalidParameterTypeException`; giờ tham số nhận cả số lẫn chuỗi.
+    - `rqt_image_view` bị tắt ngay khi mở (`GLib-GIO-ERROR ... xsettings ... 'antialiasing'`): do **VSCode bản Snap**, terminal trong VSCode
+      thừa hưởng `GSETTINGS_SCHEMA_DIR`, `GTK_PATH`... của Snap. Cách xử lý: chạy rqt (và mọi chương trình có giao diện) từ terminal
+      thường (`Ctrl+Alt+T`). Đặt `QT_QPA_PLATFORMTHEME` không có tác dụng.
+    - rqt **hiện được** `/gesture/debug_image` (Best Effort), nên **không có lỗi QoS**. Màu xám trên robot khả năng cao là do node
+      không nhận được `/image_front` lúc đó (cần kiểm tra lại bằng `ros2 topic hz /image_front` trên robot).
+    - Giao diện ảnh debug: bảng xác suất giờ nằm **cạnh video** (mặc định bên phải), không che hình. Thêm tham số
+      `debug_panel_position` (right/left/bottom/overlay), `debug_panel_scale`, `debug_box_thickness`; đổi được khi node đang chạy
+      bằng `ros2 param set /gesture_node ...`.
 
 ## Trạng thái hiện tại
 
@@ -169,7 +179,7 @@ human_detect/
 - [x] Đã gỡ các gói cũ cài kiểu `pip --user` trong `~/.local` (laptop gọn, chỉ còn venv)
 - [x] Robot: code lấy bằng git vào `/home/vistar/projects/human_detect/`, đã build và chạy được `gesture_node`
 - [ ] Robot: chạy lại `setup_venv.sh` để venv nằm trong `projects/human_detect/`
-- [ ] Robot: `rqt_image_view` không hiện ảnh `/gesture/debug_image` (mục 15)
+- [ ] Robot: `rqt_image_view` chỉ hiện màu xám; trên laptop rqt chạy bình thường nên cần kiểm tra `/image_front` trên robot (mục 16)
 - [ ] Thống nhất với nhóm: `/cmd_vel`, tên topic, mức dùng CPU (xem Ghi chú)
 - [ ] MoveForward và MoveInReverse đôi khi nhầm lẫn nhau, cần thử với người thật
 - [ ] Chưa test với người thật đứng trước camera robot
