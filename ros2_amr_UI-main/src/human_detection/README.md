@@ -33,7 +33,8 @@ Bảng cử chỉ → vận tốc nằm ở `human_detection/gesture/command_fil
 để không làm hỏng các gói ROS cài từ apt trên robot.
 
 ```bash
-./setup_venv.sh                 # tạo ~/gesture_venv (hỏi sudo một lần để cài python3-venv, ros-jazzy-vision-msgs)
+./setup_venv.sh                 # tạo <thư_mục_dự_án>/gesture_venv, vd ~/projects/human_detect/gesture_venv
+                                #   (hỏi sudo một lần nếu thiếu python3-venv, ros-jazzy-vision-msgs)
 ```
 
 Script tạo venv với `--system-site-packages`, nên venv vẫn thấy rclpy và numpy 1.26 của apt. Script cũng đặt
@@ -44,17 +45,17 @@ Script tạo venv với `--system-site-packages`, nên venv vẫn thấy rclpy v
 
 ```bash
 source /opt/ros/jazzy/setup.bash
-source ~/gesture_venv/bin/activate
+source <thư_mục_dự_án>/gesture_venv/bin/activate
 cd <ros2_ws>
 python3 -m colcon build --symlink-install
 source install/setup.bash
 ```
 
-`setup.cfg` đặt dòng đầu của file chạy node là `#!/usr/bin/env python3`, nên node chạy bằng python của venv đang kích hoạt.
+Khi build trong venv, dòng đầu của file chạy node trỏ thẳng vào python của venv, nên node luôn dùng đúng venv.
 
 ## 3. Chạy
 
-Mỗi terminal: `source /opt/ros/jazzy/setup.bash && source ~/gesture_venv/bin/activate && source <ros2_ws>/install/setup.bash`
+Mỗi terminal: `source /opt/ros/jazzy/setup.bash && source <thư_mục_dự_án>/gesture_venv/bin/activate && source <ros2_ws>/install/setup.bash`
 
 ```bash
 # Trên robot

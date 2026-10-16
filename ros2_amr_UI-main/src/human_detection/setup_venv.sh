@@ -1,18 +1,20 @@
 #!/usr/bin/env bash
 # Tao moi truong ao (venv) cho gesture_node: ROS 2 Jazzy, chay CPU.
 #
-#   ./setup_venv.sh                  # tao o ~/gesture_venv
+#   ./setup_venv.sh                  # tao o <thu muc du an>/gesture_venv  (vd: ~/projects/human_detect/gesture_venv)
 #   ./setup_venv.sh /duong/dan/venv  # tao o cho khac
 #
 # Sau do moi lan chay:
 #   source /opt/ros/jazzy/setup.bash
-#   source ~/gesture_venv/bin/activate
+#   source <thu muc du an>/gesture_venv/bin/activate
 #   source <ros2_ws>/install/setup.bash
 #   ros2 launch human_detection gesture.launch.py
 set -euo pipefail
 
-VENV="${1:-$HOME/gesture_venv}"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Thu muc du an = 3 cap tren package: <du_an>/ros2_amr_UI-main/src/human_detection
+PROJECT_DIR="$(cd "$HERE/../../.." && pwd)"
+VENV="${1:-$PROJECT_DIR/gesture_venv}"
 
 echo "=== 1. Goi he thong (can sudo) ==="
 PKGS=()
@@ -44,7 +46,10 @@ export PYTHONNOUSERSITE=1
 "$VENV/bin/python" -m pip install -r "$HERE/requirements.txt"
 
 echo "=== 4. Kiem tra ==="
+# setup.bash cua ROS dung bien chua dat -> tam tat "set -u" khi source
+set +u
 source /opt/ros/jazzy/setup.bash
+set -u
 "$VENV/bin/python" - <<'EOF'
 import numpy, torch, ultralytics, mediapipe, cv2, rclpy, vision_msgs.msg
 assert numpy.__version__.startswith("1."), f"numpy {numpy.__version__} phai < 2"

@@ -113,7 +113,7 @@ human_detect/
       Khi build **có** `--symlink-install`, dòng này vẫn là `#!/usr/bin/python3`; muốn dùng venv thì build bằng
       `python3 -m colcon build` khi đang kích hoạt venv. **Chưa test.**
     - **Đang chờ:** máy thiếu `python3-venv` (cần sudo), nên bạn cần tự chạy `setup_venv.sh`.
-11. **Đã tạo venv `~/gesture_venv` trên laptop và test thành công.**
+11. **Đã tạo venv `~/gesture_venv` trên laptop và test thành công.** (venv này đã chuyển vào thư mục dự án, xem mục 15)
     - `setup_venv.sh` chạy xong: đã cài `python3-venv`. torch, ultralytics, cv2, mediapipe nằm trong venv; numpy 1.26.4 lấy từ apt.
     - Build bằng `python3 -m colcon build --symlink-install` khi đang kích hoạt venv. Dòng đầu file chạy node là `#!/usr/bin/env python3`
       (với setuptools mới trong venv thì `--symlink-install` cũng nhận `[build_scripts]`).
@@ -128,7 +128,7 @@ human_detect/
     venv vẫn đủ thư viện; `gesture_node` trong venv vẫn nhận đúng Halt.
     Từ giờ **mọi thư viện Python của gesture chỉ nằm trong `~/gesture_venv`**, nên chạy node phải kích hoạt venv trước.
     (pip cache `~/.cache/pip` 451 MB vẫn giữ lại, dùng khi cài lại venv cho nhanh. Có thể xoá bằng `pip cache purge`.)
-13. **Chốt cách triển khai lên robot: WORKSPACE RIÊNG** (chưa làm, đang chờ robot rảnh vì có người khác đang SSH vào).
+13. **Chốt cách triển khai lên robot: WORKSPACE RIÊNG** (**đã thay bằng mục 15**: robot dùng git trong `/home/vistar/projects/human_detect`).
     - Bối cảnh: robot dùng chung, có nhiều chức năng và node của nhóm (SLAM, Path planning...). Mình chỉ phụ trách mảng gesture,
       nên **không được đụng vào workspace hay package của người khác**.
     - Chỉ chép package `human_detection` (12 MB, đã gồm 3 model) vào **`~/gesture_ws/src/`** trên robot. Không chép:
@@ -142,16 +142,34 @@ human_detect/
     Bỏ qua: `build/ install/ log/`, cache Python, venv, `Human Detection/{Dataset,runs,weights}`, `keypoints/`, video `*.mp4`, rosbag, IDE.
     Giữ lại: code, config, nhật ký, model trong `src/human_detection/models/` và `checkpoints/scratch_f16/best.pt`.
     Đã thử bằng một git tạm đặt ngoài dự án: còn **63 file / 13 MB** (thay vì hơn 2,8 GB).
+15. **Chuyển venv vào trong thư mục dự án** (thay cho mục 13 và `~/gesture_venv`).
+    - Trên robot, mọi thứ nằm trong `/home/vistar/projects/human_detect/` (lấy code về bằng **git**, không dùng rsync/scp),
+      nên venv cũng phải nằm trong đó, không đặt ở `~`.
+    - `setup_venv.sh`: mặc định venv = `<thư_mục_dự_án>/gesture_venv`, tính bằng 3 cấp thư mục trên package
+      (`<dự_án>/ros2_amr_UI-main/src/human_detection`). Laptop: `/home/kietdz/kiet/human_detect/gesture_venv`;
+      robot: `/home/vistar/projects/human_detect/gesture_venv`. `.gitignore` chặn bằng quy tắc `*_venv/`.
+    - Sửa lỗi script: `set -u` làm script thoát khi `source /opt/ros/jazzy/setup.bash`, nên bước 4 (kiểm tra) chưa từng chạy.
+      Giờ tạm tắt `set -u` khi source.
+    - `requirements.txt` ghim `setuptools>=77.0.3,<80` (torch cần ≥77, colcon của ROS cần <80); `pip check` không còn xung đột.
+    - Laptop: tạo lại venv ở vị trí mới (venv không chuyển chỗ được), **đã xoá `~/gesture_venv` cũ**. Build lại trong venv:
+      dòng đầu file chạy node giờ là đường dẫn tuyệt đối tới python của venv (`#!.../human_detect/gesture_venv/bin/python3`).
+      Test video Halt ra lệnh Halt.
+    - Robot: đã `git pull`, build và chạy `gesture_node` thành công (log khởi tạo đủ 3 model). Trên robot đã build **bên trong**
+      thư mục package (`src/human_detection/install/...`); vẫn chạy được vì colcon tự đặt `COLCON_IGNORE`.
+      **Cần chạy lại `setup_venv.sh` trên robot** để tạo venv trong `projects/human_detect/`, rồi xoá `~/gesture_venv` cũ trên robot.
+    - Vấn đề đang mở: trên robot, `rqt_image_view` mở `/gesture/debug_image` nhưng chỉ thấy màu xám. Nghi ngờ QoS không khớp
+      (node publish Best Effort, rqt subscribe Reliable) hoặc node không nhận được `/image_front`. Chưa kiểm tra xong.
 
 ## Trạng thái hiện tại
 
-- [x] ROS 2 Jazzy cài xong; thư viện Python nằm trong venv `~/gesture_venv`
+- [x] ROS 2 Jazzy cài xong; thư viện Python nằm trong venv `<dự_án>/gesture_venv` (mục 15)
 - [x] `colcon build` thành công (build trong venv)
 - [x] `gesture_node` chạy được qua ROS **trong venv** với video test và nhận đúng cử chỉ
 - [x] Đã viết `requirements.txt` và `setup_venv.sh`, đã test trên laptop
 - [x] Đã gỡ các gói cũ cài kiểu `pip --user` trong `~/.local` (laptop gọn, chỉ còn venv)
-- [x] Đã chốt cách triển khai: workspace riêng `~/gesture_ws` trên robot (mục 13)
-- [ ] Chép package lên robot, chạy `setup_venv.sh` và build (chờ robot rảnh)
+- [x] Robot: code lấy bằng git vào `/home/vistar/projects/human_detect/`, đã build và chạy được `gesture_node`
+- [ ] Robot: chạy lại `setup_venv.sh` để venv nằm trong `projects/human_detect/`
+- [ ] Robot: `rqt_image_view` không hiện ảnh `/gesture/debug_image` (mục 15)
 - [ ] Thống nhất với nhóm: `/cmd_vel`, tên topic, mức dùng CPU (xem Ghi chú)
 - [ ] MoveForward và MoveInReverse đôi khi nhầm lẫn nhau, cần thử với người thật
 - [ ] Chưa test với người thật đứng trước camera robot
@@ -160,31 +178,24 @@ human_detect/
 
 ## Việc tiếp theo
 
-0. **Triển khai lên robot bằng workspace riêng** (khi robot rảnh; báo trước cho người quản lý robot vì có bước dùng sudo):
+0. **Trên robot** (code ở `/home/vistar/projects/human_detect`, cập nhật bằng `git pull`):
    ```bash
-   # Laptop → robot: chỉ chép package (thay user@IP_robot cho đúng)
-   ssh user@IP_robot "mkdir -p ~/gesture_ws/src"
-   rsync -av --exclude='__pycache__' \
-     ~/kiet/human_detect/ros2_amr_UI-main/src/human_detection/ \
-     user@IP_robot:~/gesture_ws/src/human_detection/
-
-   # Trên robot
-   ~/gesture_ws/src/human_detection/setup_venv.sh      # sudo 1 lần; chỉ cài thêm python3-venv / vision-msgs nếu thiếu
+   cd ~/projects/human_detect && git pull
+   ros2_amr_UI-main/src/human_detection/setup_venv.sh    # tạo ~/projects/human_detect/gesture_venv (chỉ cần chạy lại khi requirements.txt đổi)
+   rm -rf ~/gesture_venv                                  # venv cũ ngoài thư mục dự án
    source /opt/ros/jazzy/setup.bash
-   source ~/gesture_venv/bin/activate
-   cd ~/gesture_ws && python3 -m colcon build --symlink-install
-   head -1 install/human_detection/lib/human_detection/gesture_node     # phải là: #!/usr/bin/env python3
+   source ~/projects/human_detect/gesture_venv/bin/activate
+   cd ~/projects/human_detect/ros2_amr_UI-main/src/human_detection
+   rm -rf build install log && python3 -m colcon build --symlink-install
    source install/setup.bash
-   ros2 launch human_detection gesture.launch.py       # camera node của nhóm đã chạy sẵn
+   ros2 launch human_detection gesture.launch.py         # mở terminal khác để chạy rqt_image_view / topic echo
    ```
-   Mỗi lần chạy: source ROS → kích hoạt venv → `source ~/gesture_ws/install/setup.bash` → `ros2 launch`.
-   **Không** build trong workspace của nhóm, **không** sửa package `camera`.
-   Trên laptop vẫn build như cũ trong `~/kiet/human_detect/ros2_amr_UI-main`.
+   **Không** sửa package `camera` và các package khác của nhóm.
 
 1. **Test với camera robot thật** qua mạng LAN. Robot đang publish `/image_front` trên domain 0, nên chỉ cần **không** đặt
    `ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST`:
    ```bash
-   source ~/gesture_venv/bin/activate
+   source ~/kiet/human_detect/gesture_venv/bin/activate
    cd ~/kiet/human_detect/ros2_amr_UI-main && source install/setup.bash
    ros2 launch human_detection gesture.launch.py
    ros2 topic echo /gesture

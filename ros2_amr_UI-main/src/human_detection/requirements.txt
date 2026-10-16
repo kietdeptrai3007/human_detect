@@ -11,6 +11,9 @@ torchvision==0.29.1+cpu
 # venv tao voi --system-site-packages nen dung luon python3-numpy 1.26 cua apt.
 numpy<2
 
+# torch can setuptools>=77.0.3, colcon cua ROS can setuptools<80 -> ghim khoang chung
+setuptools>=77.0.3,<80
+
 ultralytics==8.4.178
 mediapipe==1.1.1
 opencv-python==4.11.0.86
