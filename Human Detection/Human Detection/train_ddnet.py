@@ -7,7 +7,7 @@ Ba chế độ:
               python train_ddnet.py --mode scratch --name scratch_f16
 
   pretrain  Train trên một nguồn dữ liệu khác để lấy trọng số khởi đầu:
-              --pretrain-data syn    : video tổng hợp RoCoG (syn_ground), cùng 7 lớp.
+              --pretrain-data syn    : video tổng hợp RoCoG (syn_ground); chỉ lấy các lớp có trong CLASS_NAMES (5 lớp).
                                        Cần chạy trước:
                                        python extract_keypoints.py --splits syn_train syn_val --max-per-class 500
               --pretrain-data jhmdb  : dữ liệu JHMDB có sẵn trong repo DD-Net
@@ -17,7 +17,7 @@ Ba chế độ:
               python train_ddnet.py --mode pretrain --pretrain-data jhmdb \
                      --jhmdb-dir DD-Net/data/JHMDB --name pre_jhmdb
 
-  finetune  Nạp checkpoint pretrain, thay đầu phân loại thành 7 lớp, train trên real_ground
+  finetune  Nạp checkpoint pretrain, thay đầu phân loại thành số lớp của CLASS_NAMES (5 lớp), train trên real_ground
             theo 2 giai đoạn:
               1) đóng băng backbone, chỉ train đầu phân loại (--freeze-epochs, lr = --lr)
               2) mở băng toàn bộ, lr nhỏ hơn (--lr * --finetune-lr-mult)

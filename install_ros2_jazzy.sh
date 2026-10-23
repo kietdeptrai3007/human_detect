@@ -1,43 +1,43 @@
 #!/usr/bin/env bash
-# Cai ROS 2 Jazzy + phu thuoc cho 2 package camera va human_detection (Ubuntu 24.04)
-set -euo pipefail
+# Cai ROS 2 Jazzy (RoboStack) CHI trong moi truong conda, khong cai vao he thong.
+# Dung: bash install_ros2_jazzy.sh [ten_env]   (mac dinh: human_detect)
+set -eo pipefail
 
-echo "=== 1. Locale + universe repo ==="
-sudo apt-get update
-sudo apt-get install -y locales software-properties-common curl
-sudo locale-gen en_US en_US.UTF-8
-sudo update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8
-sudo add-apt-repository -y universe
+ENV_NAME="${1:-human_detect}"
 
-echo "=== 2. Them ROS 2 apt source ==="
-if ! dpkg -s ros2-apt-source >/dev/null 2>&1; then
-  ROS_APT_SOURCE_VERSION=$(curl -s https://api.github.com/repos/ros-infrastructure/ros-apt-source/releases/latest | grep -F "tag_name" | awk -F\" '{print $4}')
-  DEB=$(mktemp --suffix=.deb)
-  curl -L -o "$DEB" "https://github.com/ros-infrastructure/ros-apt-source/releases/download/${ROS_APT_SOURCE_VERSION}/ros2-apt-source_${ROS_APT_SOURCE_VERSION}.$(. /etc/os-release && echo "$VERSION_CODENAME")_all.deb"
-  sudo dpkg -i "$DEB"
-  rm -f "$DEB"
+CONDA_BASE=$(conda info --base 2>/dev/null) || { echo "Khong tim thay conda"; exit 1; }
+source "$CONDA_BASE/etc/profile.d/conda.sh"
+
+echo "=== 1. Cai mamba (neu chua co) ==="
+command -v mamba >/dev/null 2>&1 || conda install -n base -c conda-forge mamba -y
+
+echo "=== 2. Tao/kich hoat env '$ENV_NAME' (python 3.12) ==="
+if ! conda env list | awk '{print $1}' | grep -qx "$ENV_NAME"; then
+  mamba create -n "$ENV_NAME" -c conda-forge python=3.12 -y
 fi
-sudo apt-get update
+conda activate "$ENV_NAME"
 
-echo "=== 3. Cai ROS 2 Jazzy + cac goi can thiet ==="
-sudo apt-get install -y \
+echo "=== 3. Cau hinh channel RoboStack ==="
+conda config --env --add channels conda-forge
+conda config --env --add channels robostack-jazzy
+conda config --env --set channel_priority strict
+
+echo "=== 4. Cai ROS 2 Jazzy + phu thuoc ==="
+mamba install -y \
   ros-jazzy-ros-base \
-  ros-dev-tools \
   ros-jazzy-vision-msgs \
   ros-jazzy-rqt-image-view \
-  ros-jazzy-librealsense2 \
-  libopencv-dev python3-opencv python3-numpy \
-  python3-venv
+  colcon-common-extensions rosdep \
+  compilers cmake pkg-config ninja \
+  "numpy<2" opencv librealsense
 
-echo "=== 4. Thu vien Python cho gesture: KHONG cai o day ==="
-# torch / ultralytics / mediapipe duoc cai trong venv rieng (khong cai vao Python he thong):
-#   ros2_amr_UI-main/src/human_detection/setup_venv.sh
-
-echo "=== 5. Tu dong source ROS trong ~/.bashrc ==="
-grep -qxF 'source /opt/ros/jazzy/setup.bash' ~/.bashrc || echo 'source /opt/ros/jazzy/setup.bash' >> ~/.bashrc
+echo "=== 5. Thu vien Python cho gesture ==="
+# torch / ultralytics / mediapipe: cai bang pip trong chinh env nay (xem requirements.txt)
+#   pip install -r ros2_amr_UI-main/src/human_detection/requirements.txt
 
 echo "=== Kiem tra ==="
-source /opt/ros/jazzy/setup.bash
+conda deactivate
+conda activate "$ENV_NAME"
 ros2 --help >/dev/null && echo "ros2 OK"
-python3 -c "import rclpy, vision_msgs, numpy; print('python OK, numpy', numpy.__version__)"
-echo "XONG. Mo terminal moi (hoac: source ~/.bashrc), roi chay setup_venv.sh de cai thu vien gesture."
+python -c "import rclpy, vision_msgs, numpy; print('python OK, numpy', numpy.__version__)"
+echo "XONG. Dung: conda activate $ENV_NAME, roi colcon build trong workspace."

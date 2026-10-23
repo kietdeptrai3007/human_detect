@@ -13,6 +13,8 @@
   <exec_depend>geometry_msgs</exec_depend>
   <exec_depend>ament_index_python</exec_depend>
   <exec_depend>vision_msgs</exec_depend>
+  <exec_depend>visualization_msgs</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
   <exec_depend>python3-numpy</exec_depend>
   <exec_depend>python3-opencv</exec_depend>
   <!-- cai qua pip: pip install "numpy<2" ultralytics mediapipe -->

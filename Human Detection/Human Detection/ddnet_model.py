@@ -218,7 +218,7 @@ class DDNet(nn.Module):
     # Tiện ích cho finetune
     # ------------------------------------------------------------------
     def replace_head(self, num_classes: int) -> None:
-        """Thay lớp phân loại cuối (ví dụ 21 lớp JHMDB -> 7 lớp RoCoG)."""
+        """Thay lớp phân loại cuối (ví dụ 21 lớp JHMDB -> số lớp cử chỉ của robot)."""
         self.classifier = nn.Linear(self.classifier.in_features, num_classes)
         self.hparams["num_classes"] = num_classes
 

@@ -147,9 +147,11 @@ def load_clips(entries: Sequence[VideoEntry], kp_dir: Path | str = config.KEYPOI
             skipped[key] += 1
             examples.setdefault(key, e.rel_path)
             continue
-        if clip.label != e.label:
-            raise ValueError(f"Nhãn trong {e.npz_relpath()} ({clip.label}) khác file chia ({e.label}). "
-                             f"Hãy trích lại video này.")
+        # .npz trích trước khi gộp lớp lưu số nhãn gốc của file chia (raw_label); trích mới lưu số nhãn model.
+        if clip.label not in (e.label, e.raw_label):
+            raise ValueError(f"Nhãn trong {e.npz_relpath()} ({clip.label}) khác file chia "
+                             f"({e.raw_label}/{e.label}). Hãy trích lại video này.")
+        clip.label = e.label
         clips.append(clip)
     if verbose:
         print(f"  nạp {len(clips)}/{len(entries)} clip", end="")

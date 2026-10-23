@@ -5,11 +5,29 @@ gesture_node:
 
     # Duong dan model. De trong -> dung file trong models/ cua package
     yolo_model_path: ""        # models/best.pt                    (YOLO tim nguoi)
-    gesture_model_path: ""     # models/ddnet_gesture.pt           (DD-Net, 7 cu chi RoCoG)
+    gesture_model_path: ""     # models/ddnet_gesture.pt           (DD-Net, 5 cu chi: MoveForward Halt MoveInReverse Left Right)
     pose_model_path: ""        # models/pose_landmarker_lite.task  (MediaPipe Pose)
 
     # false = bo YOLO, coi ca khung hinh la nguoi (nhanh hon nhung khac luc train)
     use_yolo: true
+
+    # ByteTrack: gan track_id on dinh cho moi nguoi, publish /people/tracks (cho trajectory_node)
+    enable_tracking: true
+    tracker_config: ""         # "" -> config/bytetrack_person.yaml
+
+    # Khoa "nguoi chu": chi cu chi cua nguoi da khoa moi dieu khien robot (can enable_tracking: true)
+    # Chua khoa: cu chi chay cho ung vien (nguoi gan nhat); ung vien lam lock_gesture thi duoc khoa.
+    # false = AI CUNG DIEU KHIEN DUOC (khong khoa nguoi chu). Luu y: moi luc chi nhan dien 1 nguoi, nguoi do
+    # duoc chon theo IoU voi khung truoc (chua co khung thi la nguoi to nhat).
+    # Model 5 lop khong con FollowMe nen lock_gesture phai la 1 trong 5 lop (chi dung khi bat khoa).
+    enable_target_lock: false
+    lock_gesture: "Right"
+    halt_from_any: true        # Halt cua ung vien chua khoa van co hieu luc (dung nham an toan hon bo lo lenh dung)
+    lost_grace_sec: 1.5        # nguoi chu mat: cho noi lai neu ByteTrack doi ID (nen >= lost_sec)
+    candidate_dwell_sec: 5.0   # nhieu nguoi chua khoa: cu bay nhieu giay doi ung vien (>= 3.2 s cua so cu chi; 0 = tat)
+    miss_tolerance_sec: 0.3    # nguoi chu truot vai frame thi chua coi la mat
+    reassoc_dx_ratio: 1.5      # noi lai: lech ngang toi da (tinh theo be rong bbox cu)
+    reassoc_size_ratio: 1.6    # noi lai: ti le chieu cao bbox toi da so voi cu
 
     # "" = tu chon (cuda neu co), "cpu", "cuda"
     device: ""
@@ -27,10 +45,10 @@ gesture_node:
     debug_box_thickness: 2           # do day khung nguoi (pixel)
 
     # Bo loc lenh (giong robot_control.py)
-    conf_threshold: 0.7    # xac suat toi thieu de chap nhan cu chi
+    conf_threshold: 0.8    # xac suat toi thieu de chap nhan cu chi; thap hon -> coi la None
     confirm_count: 3       # so lan du doan lien tiep de doi lenh (Halt luon = 1)
-    hold_sec: 3.0          # khong thay cu chi moi qua bay nhieu giay -> ve Attention
-    lost_sec: 1.0          # mat nguoi qua bay nhieu giay -> ve Attention
+    hold_sec: 3.0          # khong thay cu chi moi qua bay nhieu giay -> ve None
+    lost_sec: 1.0          # mat nguoi qua bay nhieu giay -> ve None
 
     # Publish geometry_msgs/Twist dieu khien robot. TAT mac dinh: chi bat khi da test ky.
     enable_cmd_vel: false

@@ -8,7 +8,7 @@ package_name = 'human_detection'
 setup(
     name=package_name,
     version='1.0.0',
-    packages=[package_name, package_name + '.gesture'],
+    packages=[package_name, package_name + '.gesture', package_name + '.tracking'],
     data_files=[
         ('share/ament_index/resource_index/packages', ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
@@ -26,6 +26,8 @@ setup(
         'console_scripts': [
             'gesture_node = human_detection.gesture_node:main',
             'video_publisher = human_detection.video_publisher:main',
+            'trajectory_node = human_detection.trajectory_node:main',
+            'record_node = human_detection.record_node:main',
         ],
     },
 )

@@ -11,7 +11,7 @@ class RealSenseCapture:
     Đọc luồng MÀU của RealSense. Chỉ cần ảnh màu: pipeline YOLO + MediaPipe chạy trên RGB.
 
     Dùng 640x480 @ 30 FPS: đủ cho cử chỉ, nhẹ cho USB, và gần với video RoCoG (độ phân giải
-    thấp, người nhỏ). Nếu muốn lấy thêm khoảng cách tới người (cho FollowMe), đặt
+    thấp, người nhỏ). Nếu muốn lấy thêm khoảng cách tới người (ví dụ để bám theo người), đặt
     with_depth=True; depth được căn theo ảnh màu, đọc bằng .depth_at(x, y).
     """
 

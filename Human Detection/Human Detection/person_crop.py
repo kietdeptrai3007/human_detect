@@ -124,21 +124,27 @@ class PersonCropper:
         self._box: Optional[np.ndarray] = None   # bbox người đã làm mượt (4,)
         self._missing = 0
 
-    def _choose(self, boxes: List[Box]) -> Optional[np.ndarray]:
-        """Chọn người gần bbox trước nhất; chưa có bbox trước thì lấy người to nhất."""
+    def _choose(self, boxes: List[Box], frame_w: int) -> Optional[np.ndarray]:
+        """
+        Chọn người gần bbox trước nhất. Chưa có bbox trước thì chọn theo conf x độ gần giữa khung,
+        KHÔNG theo diện tích: vật to (ghế) hay bị nhận nhầm thành người và thắng người đứng xa.
+        """
         if not boxes:
             return None
         if self._box is not None:
             best = max(boxes, key=lambda b: iou(self._box, b[:4]))
             if iou(self._box, best[:4]) >= self.new_iou:
                 return np.array(best[:4], np.float32)
-        return np.array(boxes[0][:4], np.float32)      # boxes đã sắp xếp theo diện tích
+        def score(b):
+            cx = 0.5 * (b[0] + b[2])
+            return b[4] * (1.0 - abs(cx - 0.5 * frame_w) / (0.5 * frame_w))
+        return np.array(max(boxes, key=score)[:4], np.float32)
 
     def process(self, frame_bgr: np.ndarray) -> Optional[CropResult]:
         if frame_bgr is None or frame_bgr.size == 0:
             return None
 
-        det = self._choose(self.detector.detect(frame_bgr))
+        det = self._choose(self.detector.detect(frame_bgr), frame_bgr.shape[1])
         detected = det is not None
         if detected:
             self._missing = 0

@@ -33,6 +33,7 @@ from typing import List, Optional, Tuple
 import numpy as np
 
 from . import config
+from ..tracking.target_selector import NO_TARGET
 
 Box = Tuple[float, float, float, float, float]   # x1, y1, x2, y2, conf
 
@@ -41,19 +42,45 @@ Box = Tuple[float, float, float, float, float]   # x1, y1, x2, y2, conf
 # Bộ phát hiện người
 # ---------------------------------------------------------------------------
 class YoloPersonDetector:
-    """YOLO (ultralytics). Trả các bbox người, sắp xếp giảm dần theo diện tích."""
+    """
+    YOLO (ultralytics). Trả các bbox người, sắp xếp giảm dần theo diện tích.
+
+    tracker_cfg: đường dẫn yaml ByteTrack. Có thì detect() chạy YOLO + ByteTrack (một lần), vẫn trả
+    các Box như cũ (chỉ người conf >= conf), đồng thời ghi MỌI người kèm track_id vào last_tracks.
+    Không có thì chạy YOLO thuần như trước và last_tracks luôn rỗng.
+    """
 
     def __init__(self, weights: str = config.YOLO_WEIGHTS, device: Optional[str] = None,
                  conf: float = config.YOLO_CONF, imgsz: int = config.YOLO_IMGSZ,
-                 person_class_id: int = 0):
-        from ultralytics import YOLO
-        self.model = YOLO(str(weights))
+                 person_class_id: int = 0, tracker_cfg: Optional[str] = None,
+                 track_conf: float = config.TRACK_CONF):
         self.device = device
         self.conf = conf
         self.imgsz = imgsz
         self.classes = [person_class_id]
+        self.last_tracks: list = []        # List[TrackedPerson] của frame gần nhất
+        self.tracker = None
+        self.model = None
+        if tracker_cfg:
+            from ..tracking.person_tracker import PersonTracker
+            self.tracker = PersonTracker(weights, tracker_cfg, device=device, conf=track_conf,
+                                         imgsz=imgsz, person_class_id=person_class_id)
+        else:
+            from ultralytics import YOLO
+            self.model = YOLO(str(weights))
+
+    def reset(self) -> None:
+        """Xoá bộ nhớ ID của tracker (đổi video, camera kết nối lại)."""
+        self.last_tracks = []
+        if self.tracker is not None:
+            self.tracker.reset()
 
     def detect(self, frame_bgr: np.ndarray) -> List[Box]:
+        if self.tracker is not None:
+            self.last_tracks = self.tracker.track(frame_bgr)
+            boxes = [(*t.bbox, t.conf) for t in self.last_tracks if t.conf >= self.conf]
+            boxes.sort(key=lambda b: (b[2] - b[0]) * (b[3] - b[1]), reverse=True)
+            return boxes
         kw = dict(conf=self.conf, imgsz=self.imgsz, classes=self.classes, verbose=False)
         if self.device is not None:
             kw["device"] = self.device
@@ -68,6 +95,11 @@ class YoloPersonDetector:
 
 class FullFrameDetector:
     """Không dùng YOLO: coi cả khung hình là 'người' (chạy nhanh, nhưng khác lúc chạy thật)."""
+
+    last_tracks: list = []      # không có tracking
+
+    def reset(self) -> None:
+        pass
 
     def detect(self, frame_bgr: np.ndarray) -> List[Box]:
         h, w = frame_bgr.shape[:2]
@@ -85,6 +117,7 @@ class CropResult:
     person_box: np.ndarray  # float32 [x1, y1, x2, y2], bbox người đã làm mượt (chưa nới lề)
     detected: bool          # True = YOLO thấy người ở frame này, False = dùng lại bbox cũ
     conf: float = 0.0       # độ tin cậy YOLO của người được chọn (0 khi dùng lại bbox cũ)
+    track_id: Optional[int] = None   # track_id của người được chọn (None khi chọn theo IoU, không dùng tracker)
 
 
 def iou(a, b) -> float:
@@ -125,10 +158,24 @@ class PersonCropper:
         self._box: Optional[np.ndarray] = None   # bbox người đã làm mượt (4,)
         self._missing = 0
         self._conf = 0.0
+        self._track_id: Optional[int] = None     # track_id của người đang theo (None = chọn theo IoU)
 
-    def _choose(self, boxes: List[Box]) -> Optional[np.ndarray]:
-        """Chọn người gần bbox trước nhất; chưa có bbox trước thì lấy người to nhất."""
+    def _choose(self, boxes: List[Box], target_id: Optional[int] = None) -> Optional[np.ndarray]:
+        """
+        target_id có giá trị: chọn ĐÚNG track đó, không có thì trả None (không chuyển sang người khác).
+        target_id None: chọn người gần bbox trước nhất; chưa có bbox trước thì lấy người to nhất.
+        """
         self._conf = 0.0
+        if target_id is not None:
+            for t in getattr(self.detector, "last_tracks", ()):
+                if t.track_id != target_id:
+                    continue
+                for b in boxes:
+                    if tuple(b[:4]) == tuple(t.bbox):
+                        self._conf, self._track_id = b[4], target_id
+                        return np.array(b[:4], np.float32)
+            return None
+        self._track_id = None
         if not boxes:
             return None
         if self._box is not None:
@@ -139,11 +186,22 @@ class PersonCropper:
         self._conf = boxes[0][4]
         return np.array(boxes[0][:4], np.float32)      # boxes đã sắp xếp theo diện tích
 
-    def process(self, frame_bgr: np.ndarray) -> Optional[CropResult]:
+    def process(self, frame_bgr: np.ndarray, target_fn=None) -> Optional[CropResult]:
+        """
+        target_fn: tuỳ chọn, gọi với detector.last_tracks sau khi detect, trả về
+            track_id  -> chỉ xử lý người đó
+            NO_TARGET -> không xử lý ai (trả None ngay)
+            None      -> không có ý kiến, chọn theo IoU như cũ
+        """
         if frame_bgr is None or frame_bgr.size == 0:
             return None
 
-        det = self._choose(self.detector.detect(frame_bgr))
+        boxes = self.detector.detect(frame_bgr)
+        target_id = target_fn(getattr(self.detector, "last_tracks", [])) if target_fn is not None else None
+        if target_id == NO_TARGET:
+            self.reset()
+            return None
+        det = self._choose(boxes, target_id)
         detected = det is not None
         if detected:
             self._missing = 0
@@ -177,6 +235,7 @@ class PersonCropper:
             person_box=person.astype(np.float32).copy(),
             detected=detected,
             conf=float(self._conf) if detected else 0.0,
+            track_id=self._track_id,
         )
 
 

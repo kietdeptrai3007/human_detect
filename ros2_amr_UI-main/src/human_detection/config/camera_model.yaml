@@ -1,0 +1,11 @@
+# Thong so camera truoc de doi pixel -> vi tri tren mat dat. CHI CAN khi use_ground: true.
+# Cac gia tri duoi day la GIA DINH, CHUA DO. PHAI do/kiem tra truoc khi tin ket qua tinh bang met.
+camera_model:
+  image_width: 640            # khop image_width cua package camera
+  image_height: 360           # khop image_height cua package camera
+  hfov_deg: 69.0              # FOV ngang cua anh MAU. Tuy model RealSense (D435/D435i/D455 khac nhau): xem datasheet
+  camera_height_m: 0.5        # DO: khoang cach tu mat dat toi tam camera truoc (m)
+  pitch_deg: 0.0              # DO: goc cui xuong (do), duong = cui xuong
+  person_height_m: 1.7        # chieu cao gia dinh cua nguoi, dung khi chan bi cat khoi anh
+  pixel_err: 4.0              # sai so pixel cua day bbox, dung uoc luong do bat dinh
+  feet_margin_px: 6.0         # day bbox cach mep duoi anh it hon muc nay = chan bi cat

@@ -1,0 +1,11 @@
+# Tham so ByteTrack cho tracking nguoi (ultralytics). Xem them: ultralytics/cfg/trackers/bytetrack.yaml
+# Cac con so "frame" tinh theo so frame DUOC XU LY, khong phai 30 FPS cua camera.
+# Neu node chi xu ly ~8 FPS tren CPU thi track_buffer=30 la ~4 giay; do toc do that bang
+# `ros2 topic hz /people/tracks` roi chinh lai.
+tracker_type: bytetrack
+track_high_thresh: 0.4    # luot ghep thu nhat (dong bo voi YOLO_CONF cua nhanh cu chi)
+track_low_thresh: 0.1     # luot ghep thu hai: giu nguoi bi che mot phan, mo
+new_track_thresh: 0.4     # >= YOLO_CONF cua nhanh cu chi, neu cao hon thi nguoi conf 0.4-0.5 se khong co ID va bi mat khoi nhanh cu chi
+track_buffer: 20          # giu ID khi mat nguoi toi da bay nhieu frame
+match_thresh: 0.8         # nguong ghep (IoU); thap hon = de ghep hon nhung de nhay ID
+fuse_score: true

@@ -1,8 +1,8 @@
 """
 demo_camera.py - Thử nhận diện cử chỉ từ camera (không điều khiển robot).
 
-Đứng trước camera, làm một trong 7 cử chỉ của RoCoG; chương trình in cử chỉ đoán được
-và xác suất của cả 7 lớp. Cần ~3 giây đầu để thu đủ khung xương cho một cửa sổ.
+Đứng trước camera, làm một trong 5 cử chỉ (MoveForward, Halt, MoveInReverse, Left, Right); chương trình in cử chỉ đoán được
+và xác suất các lớp. Cần ~3 giây đầu để thu đủ khung xương cho một cửa sổ.
 
     python demo_camera.py --ckpt checkpoints/scratch_f16/best.pt
     python demo_camera.py --ckpt checkpoints/scratch_f16/best.pt --camera realsense   # D435i

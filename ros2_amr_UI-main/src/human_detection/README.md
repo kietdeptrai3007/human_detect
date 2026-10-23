@@ -1,7 +1,8 @@
 # Gói ROS 2 Human Detection + Gesture Recognition
 
-Node **`gesture_node`** nhận diện 7 cử chỉ RoCoG (Advance, Attention, Rally, MoveForward, Halt,
-FollowMe, MoveInReverse) trên ảnh camera trước `/image_front` của gói `camera`.
+Node **`gesture_node`** nhận diện cử chỉ trên ảnh camera trước `/image_front` của gói `camera`.
+Lớp đích (5): MoveForward, Halt, MoveInReverse, Left, Right. Không có lớp `None` và `FollowMe`; "không có lệnh" được suy ra khi xác suất < `conf_threshold`.
+Model `ddnet_gesture.pt` phải là bản 5 lớp (`checkpoints/v2_5cls/best.pt`); tên lớp lấy từ chính file model.
 
 ```
 /image_front ─► YOLO tìm người ─► MediaPipe Pose ─► 15 khớp ─► cửa sổ 32 frame @ 10 FPS ─► DD-Net ─► CommandFilter ─► /gesture
@@ -17,14 +18,25 @@ Công cụ **`video_publisher`** phát video hoặc webcam lên `/image_front`, 
 
 | Topic | Kiểu | Nội dung |
 |---|---|---|
-| `/gesture` | `std_msgs/String` | Lệnh đã lọc ổn định: `Halt`, `MoveForward`, ... hoặc `Attention` (đứng yên) |
-| `/gesture/raw` | `std_msgs/String` (JSON) | Dự đoán thô: `label`, `prob`, `person`, `skeleton`, `reason`, `probs` (7 lớp) |
+| `/gesture` | `std_msgs/Int32` | Số hiệu lệnh đã lọc: 0 MoveForward, 1 Halt, 2 MoveInReverse, 3 Left, 4 Right, 5 None (không có lệnh) |
+| `/gesture/name` | `std_msgs/String` | Tên của lệnh trên (để đọc, debug) |
+| `/gesture/raw` | `std_msgs/String` (JSON) | Dự đoán thô: `label`, `prob`, `person`, `skeleton`, `reason`, `probs` (5 lớp) |
 | `/gesture/person` | `vision_msgs/Detection2DArray` | Khung người đang theo dõi (0 hoặc 1 người), đơn vị pixel; `score` là độ tin cậy YOLO (0 = đang dùng lại khung cũ) |
-| `/gesture/debug_image` | `sensor_msgs/Image` | Ảnh có khung người và bảng xác suất |
+| `/gesture/debug_image` | `sensor_msgs/Image` | Ảnh có khung người và dòng `<cử chỉ> <xx>%` (độ tin cậy) |
+| `/people/tracks` | `vision_msgs/Detection2DArray` | MỌI người trong khung, `id` = track_id (ByteTrack). Luôn publish, kể cả rỗng |
+| `/people/target_id` | `std_msgs/Int32` | track_id của người chủ đã khoá, `-1` = chưa khoá |
+| `/people/target_state` | `std_msgs/String` | `IDLE` / `SEARCHING` / `LOCKED` / `LOST` |
+| `/people/trajectories` | `std_msgs/String` (JSON) | Từ `trajectory_node`: vị trí, vận tốc, quỹ đạo dự đoán của từng người, `is_commander` |
+| `/people/markers` | `visualization_msgs/MarkerArray` | Quỹ đạo cho rviz (chỉ khi `use_ground: true`) |
 | `/cmd_vel` | `geometry_msgs/Twist` | **Chỉ khi** `enable_cmd_vel: true` (mặc định TẮT) |
 
-Lệnh chỉ đổi khi cùng một cử chỉ đạt xác suất ≥ `conf_threshold` (0.7) trong `confirm_count` (3) lần liên tiếp; riêng `Halt` được nhận ngay.
-Mất người quá `lost_sec`, hoặc không thấy cử chỉ quá `hold_sec`, thì lệnh về `Attention`.
+Lệnh chỉ đổi khi cùng một cử chỉ đạt xác suất ≥ `conf_threshold` (0.8) trong `confirm_count` (3) lần liên tiếp; riêng `Halt` được nhận ngay.
+Mất người quá `lost_sec`, hoặc không thấy cử chỉ quá `hold_sec`, thì lệnh về `None`.
+**Người chủ (mặc định TẮT, `enable_target_lock: false`: ai cũng điều khiển được):** chưa khoá ai thì cử chỉ chỉ chạy cho một ứng viên (ban đầu là người gần nhất, nhiều người thì cứ `candidate_dwell_sec` đổi người) và
+chỉ `Halt` được đi qua. Ứng viên làm `lock_gesture` (mặc định `Right`, FollowMe đã bỏ) thì bị khoá; từ đó chỉ cử chỉ của người đó có hiệu lực. Người chủ mất khỏi khung
+thì về `None`, và chỉ được nối lại nếu có track mới xuất hiện đúng chỗ cũ (ByteTrack đổi ID). Tắt bằng `enable_target_lock: false`.
+Chạy cả quỹ đạo: `ros2 launch human_detection people_tracking.launch.py`.
+
 Bảng cử chỉ → vận tốc nằm ở `human_detection/gesture/command_filter.py`. Toàn bộ tham số nằm trong `config/gesture_params.yaml`.
 
 Giao diện ảnh debug (`/gesture/debug_image`) chỉnh bằng tham số, **đổi được ngay khi node đang chạy**:
