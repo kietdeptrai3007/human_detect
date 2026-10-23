@@ -31,6 +31,10 @@ YOLO_WEIGHTS = str(WORKSPACE_DIR / "runs" / "detect" / "runs" / "detect"
                    / "robot_person_detect" / "weights" / "best.pt")
 YOLO_CONF = 0.4          # ngưỡng tin cậy của bbox người
 YOLO_IMGSZ = 640
+# Tracking (ByteTrack): YOLO chạy với ngưỡng thấp để ByteTrack có detection điểm thấp cho lượt ghép
+# thứ hai; nhánh cử chỉ vẫn chỉ nhận người có conf >= YOLO_CONF.
+TRACK_CONF = 0.1
+TRACKER_CFG_DEFAULT = str(PROJECT_DIR.parents[1] / "config" / "bytetrack_person.yaml")  # khi chạy từ source
 CROP_MARGIN = 0.25       # nới bbox thêm 25% mỗi chiều (tay duỗi ra ngoài bbox thân)
 BBOX_SMOOTHING = 0.5     # EMA cho bbox: 1.0 = không làm mượt, nhỏ hơn = mượt hơn
 MAX_MISSING_FRAMES = 5   # YOLO trượt tối đa bấy nhiêu frame liền thì vẫn dùng bbox cũ

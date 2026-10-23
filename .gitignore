@@ -35,6 +35,7 @@ env/
 # ----- Du lieu train va file sinh ra khi train (rat nang, khong can cho robot) -----
 Human Detection/Dataset/
 Human Detection/Human Detection/keypoints/
+Human Detection/Human Detection/keypoints_v2/
 Human Detection/runs/
 Human Detection/weights/
 Human Detection/yolov5nu.pt

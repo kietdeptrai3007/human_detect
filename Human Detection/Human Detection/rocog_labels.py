@@ -19,8 +19,9 @@ Chạy thử:
     python rocog_labels.py
     python rocog_labels.py --ann-dir Dataset/real_ground/annotations --dataset-root Dataset
 
-Khi sau này thêm lớp LEFT/RIGHT/NONE: thêm tên vào CLASS_NAMES (ở cuối danh sách để
-không đổi số của 7 lớp cũ) rồi train lại với số lớp mới.
+Lớp của model (CLASS_NAMES) khác 7 lớp RoCoG: bỏ Advance/Attention/Rally/FollowMe (video các lớp này bị bỏ
+qua khi đọc file chia), thêm Left/Right. Model không có lớp None: lệnh yếu/không chắc được lọc ở robot bằng ngưỡng conf.
+Sửa CLASS_NAMES thì phải train lại.
 """
 
 from __future__ import annotations
@@ -38,7 +39,8 @@ import config
 # ---------------------------------------------------------------------------
 # Bảng lớp
 # ---------------------------------------------------------------------------
-CLASS_NAMES: List[str] = [
+# 7 lớp gốc của RoCoG: số nhãn trong các file annotations/*.txt của RoCoG theo thứ tự này.
+ROCOG_CLASS_NAMES: List[str] = [
     "Advance",        # 0
     "Attention",      # 1
     "Rally",          # 2
@@ -46,6 +48,15 @@ CLASS_NAMES: List[str] = [
     "Halt",           # 4
     "FollowMe",       # 5
     "MoveInReverse",  # 6
+]
+
+# Lớp của model. THỨ TỰ NÀY = số nhãn trong file robot (record_node.py phải dùng đúng thứ tự này).
+CLASS_NAMES: List[str] = [
+    "MoveForward",    # 0
+    "Halt",           # 1
+    "MoveInReverse",  # 2
+    "Left",           # 3
+    "Right",          # 4
 ]
 NUM_CLASSES = len(CLASS_NAMES)
 CLASS_TO_ID: Dict[str, int] = {name: i for i, name in enumerate(CLASS_NAMES)}
@@ -66,11 +77,12 @@ SPLIT_FILES = {
 class VideoEntry:
     """Một video trong một file chia."""
     rel_path: str      # đường dẫn như trong file chia: real/ground/Halt/S01_....mp4
-    label: int         # số nhãn 0..6
+    label: int         # số nhãn của model (chỉ số trong CLASS_NAMES)
     class_name: str    # "Halt"
     subject: str       # "S01", "S04b"; video tổng hợp thì là tên scene, ví dụ "Scene1"
     source: str        # "real" hoặc "syn"
     split: str         # tên file chia nó đến từ
+    raw_label: int = -1          # số nhãn ghi trong file chia (RoCoG: theo ROCOG_CLASS_NAMES)
 
     @property
     def stem(self) -> str:
@@ -146,24 +158,31 @@ def read_split(split: str, ann_dir: Path | str = config.ANNOTATION_DIR) -> List[
             errors.append(f"dòng {line_no}: không đúng dạng '<đường dẫn> <nhãn>': {line}")
             continue
         rel_path, label_str = parts
-        label = int(label_str)
-        if not 0 <= label < NUM_CLASSES:
-            errors.append(f"dòng {line_no}: nhãn {label} ngoài khoảng 0..{NUM_CLASSES - 1}")
+        raw = int(label_str)
+        # Video robot tự thu (real/robot/...) dùng số nhãn của CLASS_NAMES; còn lại là RoCoG.
+        names = CLASS_NAMES if rel_path.startswith("real/robot/") else ROCOG_CLASS_NAMES
+        if not 0 <= raw < len(names):
+            errors.append(f"dòng {line_no}: nhãn {raw} ngoài khoảng 0..{len(names) - 1}")
             continue
 
+        name = names[raw]
         folder = Path(rel_path).parent.name
-        if folder in CLASS_TO_ID and CLASS_TO_ID[folder] != label:
+        if folder in names and folder != name:
             errors.append(
-                f"dòng {line_no}: thư mục '{folder}' nhưng nhãn {label} "
-                f"({CLASS_NAMES[label]}) -> {rel_path}"
+                f"dòng {line_no}: thư mục '{folder}' nhưng nhãn {raw} "
+                f"({name}) -> {rel_path}"
             )
             continue
+        if name not in CLASS_TO_ID:      # lớp RoCoG không dùng (Advance, Attention, Rally, FollowMe)
+            continue
+        label = CLASS_TO_ID[name]
 
         source = "syn" if rel_path.startswith("syn") else "real"
         entries.append(VideoEntry(
             rel_path=rel_path,
             label=label,
-            class_name=CLASS_NAMES[label],
+            raw_label=raw,
+            class_name=name,
             subject=parse_subject(rel_path),
             source=source,
             split=path.stem,

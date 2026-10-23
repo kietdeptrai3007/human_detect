@@ -12,6 +12,17 @@ torchvision==0.29.1+cpu
 numpy<2
 
 ultralytics==8.4.178
+# ByteTrack cua ultralytics can lapx (import ten "lap"); thieu thi ultralytics tu pip install luc chay.
+# Da test lapx 0.10.0 tren Python 3.11 (conda); chua test tren venv Python 3.12 cua robot.
+lapx>=0.9.0
+# camera_model.py doc file yaml. venv --system-site-packages da co python3-yaml cua apt, pip se bo qua.
+pyyaml>=6.0
 mediapipe==1.1.1
 opencv-python==4.11.0.86
 opencv-contrib-python==4.11.0.86
+
+# ---------------------------------------------------------------------------
+# KHONG dung cho gesture_node/trajectory_node tren robot. Chi can neu chay phan train/danh gia
+# trong "Human Detection/Human Detection/" (vi du conda env human_detect). Bo comment khi can:
+# matplotlib        # evaluate_ddnet.py, train_ddnet.py ve confusion matrix
+# pyrealsense2      # camera_source.py doc RealSense truc tiep (khong qua ROS)

@@ -37,7 +37,7 @@ class GestureRecognizer:
     def __init__(self, ckpt_path: str, yolo_weights: Optional[str] = config.YOLO_WEIGHTS,
                  device: str = "cuda" if torch.cuda.is_available() else "cpu",
                  min_ok_ratio: float = 0.6, max_gap_sec: float = 0.6, ema: float = 0.5,
-                 pose_model_path: Optional[str] = None):
+                 pose_model_path: Optional[str] = None, tracker_cfg: Optional[str] = None):
         self.device = torch.device(device)
         self.model, self.meta = load_checkpoint(ckpt_path)
         self.model.to(self.device).eval()
@@ -50,7 +50,8 @@ class GestureRecognizer:
         self.ema = ema
 
         detector = FullFrameDetector() if yolo_weights is None else \
-            YoloPersonDetector(yolo_weights, device=None if device == "cpu" else "0")
+            YoloPersonDetector(yolo_weights, device=None if device == "cpu" else "0",
+                               tracker_cfg=tracker_cfg)
         self.cropper = PersonCropper(detector)
         from .pose_estimate import PoseEstimator
         self.pose = PoseEstimator(model_complexity=0 if "lite" in str(self.meta.get("pose_model", "lite")) else 1,
@@ -61,25 +62,46 @@ class GestureRecognizer:
         self._buf: Deque[Tuple[float, np.ndarray]] = deque()   # (t, joints) chỉ frame ok
         self._frames: Deque[Tuple[float, bool]] = deque()      # (t, ok) mọi frame, để tính ok_ratio
         self._probs: Optional[np.ndarray] = None
+        self._active_id: Optional[int] = None   # track_id người cuối cùng được xử lý (không xoá khi mất người)
+        self.window_epoch = 0                   # tăng mỗi lần cửa sổ bị xoá vì đổi người (để node reset bộ lọc lệnh)
+
+    @property
+    def last_tracks(self) -> list:
+        """Mọi người (TrackedPerson, có track_id) ở frame gần nhất; rỗng nếu không bật tracker."""
+        return getattr(self.cropper.detector, "last_tracks", [])
 
     def reset(self) -> None:
         self.cropper.reset()
+        self.cropper.detector.reset()     # xoá cả bộ nhớ ID của tracker
         self.adapter.reset()
         self._buf.clear()
         self._frames.clear()
         self._probs = None
+        self._active_id = None
+
+    def _new_person(self) -> None:
+        """Đổi sang người khác: bỏ khung xương, xác suất và thước đo của người cũ."""
+        self.adapter.reset()
+        self._buf.clear()
+        self._frames.clear()
+        self._probs = None
+        self.window_epoch += 1
 
     def close(self) -> None:
         """Giải phóng MediaPipe (tránh lỗi PoseLandmarker.__del__ khi thoát chương trình)."""
         self.pose.close()
 
     # ------------------------------------------------------------------
-    def _process_frame(self, frame_bgr: np.ndarray) -> Tuple[bool, Optional[np.ndarray]]:
-        crop = self.cropper.process(frame_bgr)
+    def _process_frame(self, frame_bgr: np.ndarray, target_fn=None) -> Tuple[bool, Optional[np.ndarray]]:
+        crop = self.cropper.process(frame_bgr, target_fn)
         self.last_crop = crop
         if crop is None or crop.crop.size == 0:
             self.adapter.reset()          # mất người -> quên vị trí/thước đo cũ (giống lúc trích dữ liệu)
             return False, None
+        if crop.track_id is not None:
+            if self._active_id is not None and crop.track_id != self._active_id:
+                self._new_person()        # cửa sổ 32 frame không được trộn khung xương của hai người
+            self._active_id = crop.track_id
         kps = self.pose.get_keypoints(crop.crop)
         if kps is None:
             return True, None
@@ -109,8 +131,9 @@ class GestureRecognizer:
 
     # ------------------------------------------------------------------
     @torch.no_grad()
-    def update(self, frame_bgr: np.ndarray, t: float) -> GestureResult:
-        person, joints = self._process_frame(frame_bgr)
+    def update(self, frame_bgr: np.ndarray, t: float, target_fn=None) -> GestureResult:
+        """target_fn: xem PersonCropper.process (chọn người theo track_id); None = chọn theo IoU như cũ."""
+        person, joints = self._process_frame(frame_bgr, target_fn)
         self._frames.append((t, joints is not None))
         if joints is not None:
             self._buf.append((t, joints))

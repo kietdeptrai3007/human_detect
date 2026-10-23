@@ -1,0 +1,20 @@
+trajectory_node:
+  ros__parameters:
+    tracks_topic: "/people/tracks"     # tu gesture_node (Detection2DArray, id = track_id)
+
+    # false = du doan trong khong gian anh (pixel, khong can do camera)
+    # true  = du doan tren mat dat (met, he robot: x truoc, y trai), can camera_model_path
+    use_ground: false
+    camera_model_path: ""              # "" -> config/camera_model.yaml cua package
+
+    horizon_sec: 2.0                   # du doan xa bay nhieu giay
+    step_sec: 0.25                     # khoang cach giua cac diem du doan
+    min_hits: 5                        # so lan thay toi thieu truoc khi xuat quy dao
+    lost_sec: 1.0                      # mat nguoi qua bay nhieu giay thi xoa track
+    # Do lech chuan gia toc (don vi toa do / s^2): pixel/s^2 khi use_ground=false, m/s^2 khi true
+    accel_std_image: 50.0
+    accel_std_ground: 1.0
+    pixel_std: 6.0                     # sai so phep do (pixel), chi dung khi use_ground=false
+
+    publish_markers: true              # /people/markers cho rviz (chi khi use_ground=true)
+    marker_frame_id: "base_link"       # he toa do cua diem tren mat dat

@@ -36,18 +36,17 @@ from gesture_recognizer import GestureRecognizer
 class Motion:
     vx: float = 0.0
     wz: float = 0.0
-    follow: bool = False       # FollowMe: bật chế độ bám theo người (xem FollowController)
 
 
 GESTURE_TO_MOTION: Dict[str, Motion] = {
     "MoveForward":   Motion(vx=0.20),
-    "Advance":       Motion(vx=0.20),
     "MoveInReverse": Motion(vx=-0.15),
     "Halt":          Motion(),
-    "Attention":     Motion(),          # đứng yên, chờ lệnh
-    "Rally":         Motion(),          # ví dụ: về điểm tập kết -> bạn tự gắn hành vi riêng
-    "FollowMe":      Motion(follow=True),
+    "Left":          Motion(),          # chưa gắn chuyển động: bạn tự gắn hành vi riêng
+    "Right":         Motion(),
+    "None":          Motion(),          # không có lệnh: đứng yên
 }
+IDLE = "None"
 STOP = Motion()
 
 
@@ -117,7 +116,7 @@ def make_backend(name: str, topic: str):
 class CommandFilter:
     def __init__(self, conf: float, confirm: int, hold_sec: float, lost_sec: float):
         self.conf, self.confirm, self.hold_sec, self.lost_sec = conf, confirm, hold_sec, lost_sec
-        self.current = "Attention"
+        self.current = IDLE
         self._cand, self._count = None, 0
         self._last_set = time.time()
         self._last_seen = time.time()
@@ -126,7 +125,7 @@ class CommandFilter:
         if label is None:                                     # chưa có dự đoán / mất người
             self._cand, self._count = None, 0
             if now - self._last_seen > self.lost_sec:
-                self.current = "Attention"
+                self.current = IDLE
             return self.current
         self._last_seen = now
 
@@ -144,7 +143,7 @@ class CommandFilter:
             self._cand, self._count = None, 0
 
         if now - self._last_set > self.hold_sec:              # lâu không thấy cử chỉ -> dừng
-            self.current = "Attention"
+            self.current = IDLE
         return self.current
 
 
@@ -187,8 +186,8 @@ def main() -> None:
                 t_pred = now
                 print(f"   model: {res.label or res.reason} {res.prob * 100:3.0f}%   lệnh hiện tại: {cmd}", flush=True)
             if cmd != last_cmd:
-                print(f"[{time.strftime('%H:%M:%S')}] {cmd}  ->  vx={motion.vx:+.2f} wz={motion.wz:+.2f}"
-                      f"{' follow' if motion.follow else ''}", flush=True)
+                print(f"[{time.strftime('%H:%M:%S')}] {cmd}  ->  vx={motion.vx:+.2f} wz={motion.wz:+.2f}",
+                      flush=True)
                 last_cmd = cmd
             if args.show:
                 txt = f"{res.label or res.reason} {res.prob:.2f} | CMD: {cmd}"
